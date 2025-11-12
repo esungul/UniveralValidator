@@ -1,0 +1,6 @@
+flask==2.3.3
+pydantic==2.0.0
+simple-salesforce==1.12.5
+python-dotenv==1.0.0
+pytest==7.4.0
+requests==2.31.0

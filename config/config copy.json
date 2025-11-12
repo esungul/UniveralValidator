@@ -1,0 +1,342 @@
+{
+  "metadata": {
+    "version": "2.2",
+    "description": "Validation Configuration - Basic (Always) + Reason-Based (Conditional)",
+    "last_updated": "2025-11-10"
+  },
+  
+  "system_accounts": [
+    "Automated User",
+    "Automated Process",
+    "System Administrator"
+  ],
+  
+  "validations": {
+    
+    "basic": {
+      "description": "Basic validations that run for ALL MSISDNs - independent of order reason",
+      "always_enabled": true,
+      "checks": [
+        {
+          "id": "line_has_sim_card",
+          "name": "Line Has SIM Card",
+          "description": "Line must have at least one SIM Card in children",
+          "mandatory": true,
+          "validation_type": "presence",
+          "logic": "search_line_children_for_sim_card"
+        },
+        {
+          "id": "line_children_have_charges",
+          "name": "All Line Children Have Charges Field",
+          "description": "Each line child must have charges field (not null). Value can be 0 or positive.",
+          "mandatory": true,
+          "validation_type": "charges",
+          "logic": "validate_all_line_children_charges",
+          "allow_zero": true
+        },
+        {
+          "id": "device_exists",
+          "name": "Device Exists",
+          "description": "Device must exist and be linked to line",
+          "mandatory": true,
+          "validation_type": "presence",
+          "logic": "validate_device_exists"
+        },
+        {
+          "id": "device_has_charges",
+          "name": "Device Has Charges Field",
+          "description": "Device must have charges field (not null). Value can be 0 or positive.",
+          "mandatory": true,
+          "validation_type": "charges",
+          "logic": "validate_device_charges",
+          "allow_zero": true
+        },
+        {
+          "id": "device_children_have_charges",
+          "name": "Device Children Have Charges Field",
+          "description": "If device has children, they must have charges field (not null). Value can be 0 or positive.",
+          "mandatory": false,
+          "validation_type": "charges",
+          "conditional": "only_if_device_children_exist",
+          "logic": "validate_all_device_children_charges",
+          "allow_zero": true
+        }
+      ]
+    },
+    
+    "reason_based": {
+      "description": "Additional validations based on order reason - conditional checks",
+      
+      "Plan Upgrade": {
+        "enabled": true,
+        "description": "Additional validations when order reason is Plan Upgrade",
+        "checks": [
+          {
+            "id": "plan_upgrade_line_active",
+            "name": "Line Status Active",
+            "description": "Line must be in Active status",
+            "mandatory": false,
+            "validation_type": "status",
+            "field": "Line Asset.status",
+            "expected_value": "Active"
+          },
+          {
+            "id": "plan_upgrade_no_disconnection",
+            "name": "No Disconnection Pending",
+            "description": "Line should not have a disconnection date scheduled",
+            "mandatory": false,
+            "validation_type": "presence",
+            "field": "Line Asset.disconnect_info.disconnect_date",
+            "should_be_null": true
+          },
+          {
+            "id": "plan_upgrade_billing_active",
+            "name": "Billing Account Active",
+            "description": "Line must have valid billing number",
+            "mandatory": false,
+            "validation_type": "presence",
+            "field": "line_details.billing_number",
+            "should_not_be_null": true
+          }
+        ]
+      },
+      
+      "Device Change": {
+        "enabled": true,
+        "description": "Additional validations when order reason is Device Change",
+        "checks": [
+          {
+            "id": "device_change_device_active",
+            "name": "Device Status Active",
+            "description": "Device must be in Active status",
+            "mandatory": false,
+            "validation_type": "status",
+            "field": "Device Asset.status",
+            "expected_value": "Active"
+          },
+          {
+            "id": "device_change_no_device_disconnect",
+            "name": "Device Not Disconnected",
+            "description": "Device should not have a disconnection date",
+            "mandatory": false,
+            "validation_type": "presence",
+            "field": "Device Asset.disconnect_info.disconnect_date",
+            "should_be_null": true
+          },
+          {
+            "id": "device_change_has_reference",
+            "name": "Device Has Reference ID",
+            "description": "Device must have asset reference for tracking",
+            "mandatory": false,
+            "validation_type": "presence",
+            "field": "Device Asset.original_oli_id",
+            "should_not_be_null": true
+          }
+        ]
+      },
+      
+      "SIM Replacement": {
+        "enabled": true,
+        "description": "Additional validations when order reason is SIM Replacement",
+        "checks": [
+          {
+            "id": "sim_replacement_has_sim",
+            "name": "Line Has SIM Card",
+            "description": "Line must have SIM Card in children",
+            "mandatory": true,
+            "validation_type": "presence",
+            "logic": "search_line_children_for_sim_card"
+          },
+          {
+            "id": "sim_replacement_sim_charges",
+            "name": "SIM Has Charges",
+            "description": "SIM Card must have charges associated",
+            "mandatory": false,
+            "validation_type": "charges",
+            "logic": "validate_sim_card_charges"
+          }
+        ]
+      },
+      
+      "Service Addition": {
+        "enabled": true,
+        "description": "Additional validations when adding services",
+        "checks": [
+          {
+            "id": "service_addition_line_active",
+            "name": "Line Status Active",
+            "description": "Line must be in Active status to add services",
+            "mandatory": true,
+            "validation_type": "status",
+            "field": "Line Asset.status",
+            "expected_value": "Active"
+          }
+        ]
+      }
+    }
+  },
+
+  "salesforce_queries": {
+    "latest_line_for_msisdn": {
+      "description": "Get the LATEST mobile line for MSISDN (Query 1)",
+      "from_table": "Asset",
+      "fields": [
+        "Id",
+        "PR_MSISDN__c",
+        "Product2.Name",
+        "Product2.ProductCode",
+        "Product2.vlocity_cmt__ParentClassCode__c",
+        "vlocity_cmt__ProvisioningStatus__c",
+        "vlocity_cmt__RootItemId__c",
+        "vlocity_cmt__ParentItemId__c",
+        "vlocity_cmt__AssetReferenceId__c",
+        "External_Asset_Reference_Id__c",
+        "vlocity_cmt__OneTimeCharge__c",
+        "vlocity_cmt__RecurringCharge__c",
+        "Disconnection_Reason__c",
+        "vlocity_cmt__DisconnectDate__c",
+        "CreatedDate",
+        "CreatedBy.Name",
+        "LastModifiedDate",
+        "LastModifiedBy.Name",
+        "vlocity_cmt__OrderId__r.Id",
+        "PR_Original_OLI_ID__c",
+        "vlocity_cmt__BillingAccountId__r.Segment__c",
+        "CB_Subscription_Id__c",
+        "vlocity_cmt__BillingAccountId__r.PR_Mobile_Billing_Number__c"
+      ],
+      "where_conditions": [
+        "PR_MSISDN__c = '{msisdn}'",
+        "Product2.vlocity_cmt__ParentClassCode__c = 'PR_B2C_Mobile_Line_Class'",
+        "Product2.Name != 'SIM Card'"
+      ],
+      "order_by": "CreatedDate DESC",
+      "limit": 1
+    },
+
+    "device_for_line": {
+      "description": "Get DEVICE linked to LINE via asset reference (Query 2)",
+      "from_table": "Asset",
+      "fields": [
+        "Id",
+        "PR_MSISDN__c",
+        "Product2.Name",
+        "Product2.ProductCode",
+        "Product2.vlocity_cmt__ParentClassCode__c",
+        "vlocity_cmt__ProvisioningStatus__c",
+        "vlocity_cmt__RootItemId__c",
+        "vlocity_cmt__ParentItemId__c",
+        "vlocity_cmt__AssetReferenceId__c",
+        "External_Asset_Reference_Id__c",
+        "vlocity_cmt__OneTimeCharge__c",
+        "vlocity_cmt__RecurringCharge__c",
+        "CreatedDate",
+        "CreatedBy.Name",
+        "LastModifiedDate",
+        "LastModifiedBy.Name",
+        "vlocity_cmt__OrderId__r.Id",
+        "PR_Original_OLI_ID__c",
+        "PR_Generic_Reporting_String__c",
+        "Contract_Term__c",
+        "PRB2C_Installment_ID__c"
+      ],
+      "where_conditions": [
+        "External_Asset_Reference_Id__c = '{asset_reference_id}'"
+      ]
+    },
+
+    "children_for_root_item": {
+      "description": "Get all children of a root item (Query 2b)",
+      "from_table": "Asset",
+      "fields": [
+        "Id",
+        "PR_MSISDN__c",
+        "Product2.Name",
+        "Product2.ProductCode",
+        "Product2.vlocity_cmt__ParentClassCode__c",
+        "vlocity_cmt__ProvisioningStatus__c",
+        "vlocity_cmt__RootItemId__c",
+        "vlocity_cmt__ParentItemId__c",
+        "vlocity_cmt__AssetReferenceId__c",
+        "External_Asset_Reference_Id__c",
+        "vlocity_cmt__OneTimeCharge__c",
+        "vlocity_cmt__RecurringCharge__c",
+        "Disconnection_Reason__c",
+        "vlocity_cmt__DisconnectDate__c",
+        "CreatedDate",
+        "CreatedBy.Name",
+        "LastModifiedDate",
+        "LastModifiedBy.Name",
+        "vlocity_cmt__OrderId__r.Id",
+        "PR_Original_OLI_ID__c"
+      ],
+      "where_conditions": [
+        "vlocity_cmt__RootItemId__c = '{root_item_id}'"
+      ]
+    },
+
+    "device_children": {
+      "description": "Get children of DEVICE (Query 3)",
+      "from_table": "Asset",
+      "fields": [
+        "Id",
+        "PR_MSISDN__c",
+        "Product2.Name",
+        "Product2.ProductCode",
+        "Product2.vlocity_cmt__ParentClassCode__c",
+        "vlocity_cmt__ProvisioningStatus__c",
+        "vlocity_cmt__RootItemId__c",
+        "vlocity_cmt__ParentItemId__c",
+        "vlocity_cmt__AssetReferenceId__c",
+        "External_Asset_Reference_Id__c",
+        "vlocity_cmt__OneTimeCharge__c",
+        "vlocity_cmt__RecurringCharge__c",
+        "Disconnection_Reason__c",
+        "vlocity_cmt__DisconnectDate__c",
+        "CreatedDate",
+        "CreatedBy.Name",
+        "LastModifiedDate",
+        "LastModifiedBy.Name",
+        "vlocity_cmt__OrderId__r.Id",
+        "PR_Original_OLI_ID__c"
+      ],
+      "where_conditions": [
+        "vlocity_cmt__RootItemId__c = '{device_root_id}'"
+      ]
+    },
+
+    "order_history_for_msisdn": {
+      "description": "Get last 3 orders with detailed OrderItem info",
+      "from_table": "OrderItem",
+      "fields": [
+        "Id",
+        "Order.Id",
+        "Order.Type",
+        "Order.vlocity_cmt__Reason__c",
+        "Order.vlocity_cmt__OrderStatus__c",
+        "Order.vlocity_cmt__Notes__c",
+        "Order.CreatedBy.Name",
+        "Order.vlocity_cmt__OrchestrationPlanId__r.CreatedBy.Name",
+        "Order.vlocity_cmt__OrchestrationPlanId__r.Id",
+        "Order.vlocity_cmt__SubmittedToOmDate__c",
+        "Order.Status",
+        "PR_MSISDN__c",
+        "CreatedDate",
+        "LastModifiedDate",
+        "vlocity_cmt__Product2Id__r.Name",
+        "vlocity_cmt__Product2Id__r.vlocity_cmt__ParentClassCode__c",
+        "PR_Original_OLI_ID__c",
+        "PR_Generic_Reporting_String__c",
+        "Contract_Term__c",
+        "vlocity_cmt__BillingAccountId__r.Segment__c",
+        "vlocity_cmt__BillingAccountId__r.vlocity_cmt__AccountPaymentType__c"
+      ],
+      "where_conditions": [
+        "PR_MSISDN__c = '{msisdn}'",
+        "vlocity_cmt__Product2Id__r.Name != 'SIM Card'"
+      ],
+      "order_by": "CreatedDate DESC",
+      "limit": 3
+    }
+  }
+}
