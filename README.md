@@ -58,7 +58,7 @@ POST /api/validate
 Content-Type: application/json
 
 {
-  "msisdn": "12218071145"
+  "msisdn": ""
 }
 ```
 
